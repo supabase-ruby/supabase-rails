@@ -1,5 +1,6 @@
 # supabase-rails
 
+[![Test](https://github.com/supabase-ruby/supabase-rails/actions/workflows/test.yml/badge.svg)](https://github.com/supabase-ruby/supabase-rails/actions/workflows/test.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](./LICENSE)
 [![Gem](https://img.shields.io/badge/gem-supabase--rails-CC342D?logo=rubygems&logoColor=white)](https://rubygems.org/gems/supabase-rails)
 [![Ruby](https://img.shields.io/badge/ruby-%3E%3D%203.0-CC342D?logo=ruby&logoColor=white)](https://www.ruby-lang.org/)
@@ -176,6 +177,21 @@ Array syntax (`auth: [:user, :secret]`) accepts multiple methods — first match
 ## Status
 
 The gem is in public beta (v0.x). Breaking changes only ship as a major bump. The gem is still early — expect ergonomic improvements and features to land frequently in minor releases. Found a rough edge? [Open an issue](https://github.com/supabase-ruby/supabase-rails/issues) or send a PR.
+
+## Releasing
+
+Releases are published to RubyGems via [Trusted Publishing](https://guides.rubygems.org/trusted-publishing/) — no API tokens stored anywhere. To cut a release:
+
+1. Update `CHANGELOG.md`, moving items from `[Unreleased]` to a new version section.
+2. Bump `Supabase::Rails::VERSION` in `lib/supabase/rails/version.rb`.
+3. Commit: `git commit -am "release: v0.1.0"`
+4. Tag and push: `git tag v0.1.0 && git push origin main --tags`
+
+The [release workflow](.github/workflows/release.yml) builds the gem, runs the test suite, publishes to RubyGems via OIDC, and creates a GitHub Release with auto-generated notes.
+
+**One-time setup** (on rubygems.org): under the `supabase-rails` gem settings → Trusted Publishers, add a GitHub Actions publisher with repo `supabase-ruby/supabase-rails`, workflow `release.yml`. Until the gem is first published, use [Pending Trusted Publishers](https://guides.rubygems.org/trusted-publishing/#pending-trusted-publishers) to reserve the name.
+
+For added safety, gate the workflow on a [GitHub Environment](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment) (`environment: name: rubygems` in `release.yml`) so publishing requires manual approval per release.
 
 ## License
 

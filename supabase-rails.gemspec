@@ -18,6 +18,8 @@ Gem::Specification.new do |spec|
 
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/supabase-ruby/supabase-rails"
+  spec.metadata["changelog_uri"] = "https://github.com/supabase-ruby/supabase-rails/blob/main/CHANGELOG.md"
+  spec.metadata["rubygems_mfa_required"] = "true"
 
   spec.files = Dir["lib/**/*.rb"]
   spec.require_paths = ["lib"]
