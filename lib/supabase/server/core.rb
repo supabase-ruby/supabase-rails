@@ -1,13 +1,10 @@
 # frozen_string_literal: true
 
-require "json"
-require "jwt"
-require "net/http"
 require "openssl"
-require "uri"
 
 require_relative "env"
 require_relative "errors"
+require_relative "jwt"
 
 module Supabase
   module Server
@@ -145,63 +142,14 @@ module Supabase
         return nil if token.nil? || token.to_s.empty?
         return nil if token.start_with?("sb_")
 
-        if env.jwks.nil?
-          raise AuthError.new(
-            "JWKS not configured for user auth mode",
-            AuthError::AUTH_GENERIC_ERROR,
-            500
-          )
-        end
-
-        jwt_claims = verify_jwt(token, env.jwks)
-        raise AuthError.invalid_credentials unless jwt_claims.is_a?(Hash) && jwt_claims["sub"].is_a?(String)
+        claims = JWT.verify(token, env: env)
 
         AuthResult.new(
           auth_mode: :user,
           token: token,
-          user_claims: build_user_claims(jwt_claims),
-          jwt_claims: jwt_claims,
+          user_claims: claims[:user_claims],
+          jwt_claims: claims[:jwt_claims],
           key_name: nil
-        )
-      rescue AuthError
-        raise
-      rescue StandardError
-        raise AuthError.invalid_credentials
-      end
-
-      def verify_jwt(token, jwks_source)
-        jwks_data = jwks_url?(jwks_source) ? fetch_jwks(jwks_source) : jwks_source
-
-        payload, _header = JWT.decode(
-          token, nil, true,
-          algorithms: %w[RS256 ES256 HS256],
-          jwks: jwks_data,
-          allow_nil_kid: true
-        )
-        payload
-      end
-
-      def jwks_url?(jwks)
-        jwks.is_a?(URI::HTTP) || jwks.is_a?(URI::HTTPS)
-      end
-
-      def fetch_jwks(url)
-        response = Net::HTTP.get_response(url)
-        raise AuthError.invalid_credentials unless response.is_a?(Net::HTTPSuccess)
-
-        parsed = JSON.parse(response.body)
-        return parsed if parsed.is_a?(Hash) && parsed["keys"].is_a?(Array)
-
-        raise AuthError.invalid_credentials
-      end
-
-      def build_user_claims(jwt_claims)
-        UserClaims.new(
-          id: jwt_claims["sub"],
-          role: jwt_claims["role"],
-          email: jwt_claims["email"],
-          app_metadata: jwt_claims["app_metadata"],
-          user_metadata: jwt_claims["user_metadata"]
         )
       end
 
