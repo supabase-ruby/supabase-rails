@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "openssl"
+require "supabase"
 
 require_relative "env"
 require_relative "errors"
@@ -42,6 +43,81 @@ module Supabase
         end
 
         raise AuthError.invalid_credentials
+      end
+
+      def create_context_client(auth: nil, env: nil, supabase_options: nil)
+        resolved_env = env.is_a?(SupabaseEnv) ? env : Env.resolve(env || {})
+        token, key_name = extract_auth_fields(auth)
+
+        anon_key = resolve_publishable_key(resolved_env.publishable_keys, key_name)
+
+        ::Supabase::Client.new(
+          supabase_url: resolved_env.url,
+          supabase_key: anon_key,
+          options: build_context_client_options(supabase_options || {}, token)
+        )
+      end
+
+      def extract_auth_fields(auth)
+        return [nil, nil] if auth.nil?
+
+        if auth.respond_to?(:token) && auth.respond_to?(:key_name)
+          return [auth.token, auth.key_name]
+        end
+
+        token = auth[:token]
+        token = auth["token"] if token.nil?
+
+        key_name =
+          if auth.respond_to?(:key?) && auth.key?(:key_name)
+            auth[:key_name]
+          elsif auth.respond_to?(:key?) && auth.key?("key_name")
+            auth["key_name"]
+          end
+
+        [token, key_name]
+      end
+
+      def resolve_publishable_key(keys, key_name)
+        name = key_name || "default"
+        anon_key = keys[name]
+        anon_key = keys.values.first if anon_key.nil? && key_name.nil?
+
+        if anon_key.nil? || anon_key.to_s.empty?
+          raise(
+            name == "default" ? EnvError.missing_default_publishable_key : EnvError.missing_publishable_key(name)
+          )
+        end
+
+        anon_key
+      end
+
+      def build_context_client_options(supabase_options, token)
+        global = option_value(supabase_options, :global) || {}
+        raw_headers = option_value(global, :headers) || {}
+
+        safe_headers = raw_headers.reject do |k, _|
+          key = k.to_s.downcase
+          key == "authorization" || key == "apikey"
+        end
+        safe_headers = safe_headers.merge("Authorization" => "Bearer #{token}") if token && !token.to_s.empty?
+
+        auth_opts = option_value(supabase_options, :auth) || {}
+        auth_opts = auth_opts.merge(
+          persist_session: false,
+          auto_refresh_token: false,
+          detect_session_in_url: false
+        )
+
+        new_global = global.merge(headers: safe_headers)
+
+        supabase_options.merge(global: new_global, auth: auth_opts)
+      end
+
+      def option_value(hash, key)
+        return nil unless hash.is_a?(Hash)
+
+        hash.key?(key) ? hash[key] : hash[key.to_s]
       end
 
       def lookup_header(headers, name)
