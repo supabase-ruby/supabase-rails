@@ -85,31 +85,25 @@ module Supabase
 
         def fetch_with_cache(url)
           url_str = url.to_s
-          now = current_time
 
           @cache_mutex.synchronize do
             entry = @cache[url_str]
+            now = current_time
             return entry[:value] if entry && entry[:value] && !ttl_expired?(entry[:fetched_at], now)
             if entry && entry[:last_miss_at] && !cooldown_expired?(entry[:last_miss_at], now)
               raise AuthError.invalid_credentials
             end
-          end
 
-          begin
-            fetched = fetch_remote(url)
-          rescue StandardError => e
-            @cache_mutex.synchronize do
-              entry = (@cache[url_str] ||= {})
-              entry[:last_miss_at] = current_time
+            begin
+              fetched = fetch_remote(url)
+              @cache[url_str] = { value: fetched, fetched_at: current_time }
+              fetched
+            rescue StandardError => e
+              slot = (@cache[url_str] ||= {})
+              slot[:last_miss_at] = current_time
+              raise e
             end
-            raise e
           end
-
-          @cache_mutex.synchronize do
-            @cache[url_str] = { value: fetched, fetched_at: current_time }
-          end
-
-          fetched
         end
 
         def fetch_remote(url)
